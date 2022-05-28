@@ -1,0 +1,6 @@
+resources/spark/securitygroup.txt
+resources/spark/Lambda/submit_spark_job
+resources/spark/Lambda/wait_emr_cluster
+resources/spark/Lambda/wait_integration_cluster
+/**/emr-configuration.json
+/**/.env

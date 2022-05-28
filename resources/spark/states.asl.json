@@ -1,0 +1,94 @@
+{
+  "Comment": "Comprehend Tutorial state machine",
+  "StartAt": "Create_Cluster",
+  "TimeoutSeconds": 3600,
+  "States": {
+    "Create_Cluster": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::elasticmapreduce:createCluster.sync",
+      "Parameters": {
+        "Applications": [
+          {
+            "Name": "Livy"
+          },
+          {
+            "Name": "Spark"
+          }
+        ],
+        "AutoScalingRole": "${EmrAutoScalingDefaultRole}",
+        "Configurations": [
+          {
+            "Classification": "container-executor",
+            "ConfigurationProperties": {
+            },
+            "Configurations": [
+              {
+                "Classification": "docker",
+                "ConfigurationProperties": {
+                  "docker.privileged-containers.registries": "local,centos,${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com",
+                  "docker.trusted.registries": "local,centos,${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com"
+                }
+              }
+            ]
+          },
+          {
+            "Classification": "livy-conf",
+            "ConfigurationProperties": {
+              "livy.spark.master": "yarn",
+              "livy.spark.deploy-mode": "cluster",
+              "livy.server.session.timeout": "16h"
+            }
+          },
+          {
+            "Classification": "hive-site",
+            "ConfigurationProperties": {
+              "hive.execution.mode": "container"
+            }
+          },
+          {
+            "Classification": "spark-defaults",
+            "ConfigurationProperties": {
+              "spark.executorEnv.YARN_CONTAINER_RUNTIME_TYPE": "docker",
+              "spark.yarn.am.waitTime": "300s",
+              "spark.yarn.appMasterEnv.YARN_CONTAINER_RUNTIME_TYPE": "docker",
+              "spark.executorEnv.YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG": "hdfs:///user/hadoop/config.json",
+              "spark.executorEnv.YARN_CONTAINER_RUNTIME_DOCKER_IMAGE": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrImage}:${EcrImageTag}",
+              "spark.executor.instances": 2,
+              "spark.yarn.appMasterEnv.YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG": "hdfs:///user/hadoop/config.json",
+              "spark.yarn.appMasterEnv.YARN_CONTAINER_RUNTIME_DOCKER_IMAGE": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrImage}:${EcrImageTag}"
+            }
+          }
+        ],
+        "Instances": {
+          "Ec2KeyName": "${EC2KeyPair}",
+          "EmrManagedMasterSecurityGroup": "${EMRMasterSecurityGroup}",
+          "EmrManagedSlaveSecurityGroup": "${EMRCoreTaskSecurityGroup}",
+          "KeepJobFlowAliveWhenNoSteps": true,
+          "TerminationProtected": false,
+          "InstanceGroups": [
+            {
+              "Market": "ON_DEMAND",
+              "InstanceRole": "MASTER",
+              "InstanceType": "m1.small",
+              "InstanceCount": 1
+            },
+            {
+              "Market": "ON_DEMAND",
+              "InstanceRole": "CORE",
+              "InstanceType": "m1.small",
+              "InstanceCount": 1
+            }
+          ],
+          "Ec2SubnetId": "${PublicSubnetA}"
+        },
+        "JobFlowRole": "${EMRInstanceProfile}",
+        "LogUri": "${EmrLogUri}",
+        "Name": "EMR 6.6.0 with Docker",
+        "ReleaseLabel": "emr-6.6.0",
+        "ServiceRole": "${EMRDefaultRole}",
+        "VisibleToAllUsers": true
+      },
+      "End": true
+    }
+  }
+}

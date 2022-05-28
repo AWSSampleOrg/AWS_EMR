@@ -1,0 +1,561 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: EMR
+# ------------------------------------------------------------#
+# Input Parameters
+# ------------------------------------------------------------#
+Parameters:
+  # Project Name Parameter
+  ProjectPrefix:
+    Type: String
+    Default: ""
+
+  # EMR
+  EmrLogUri:
+    Type: String
+
+  EcrImage:
+    Type: String
+
+  EcrImageTag:
+    Type: String
+
+  # NetWork Configuration Parameter
+  VPCCidr:
+    Type: String
+    Default: 192.168.0.0/16
+  PublicSubnetACidr:
+    Type: String
+    Default: 192.168.0.0/24
+  PublicSubnetCCidr:
+    Type: String
+    Default: 192.168.64.0/24
+  PrivateSubnetACidr:
+    Type: String
+    Default: 192.168.128.0/24
+  PrivateSubnetCCidr:
+    Type: String
+    Default: 192.168.192.0/24
+
+Resources:
+  # ------------------------------------------------------------#
+  # EC2
+  # ------------------------------------------------------------#
+  EC2KeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: KeyPairForEMR
+
+  # ------------------------------------------------------------#
+  # EMR
+  # ------------------------------------------------------------#
+  # EMR:
+  #   Type: AWS::EMR::Cluster
+  #   Properties:
+  #     Applications:
+  #       - Name: Livy
+  #       - Name: Spark
+  #     AutoScalingRole: !Ref EmrAutoScalingDefaultRole
+  #     Configurations:
+  #       - Classification: container-executor
+  #         ConfigurationProperties: {}
+  #         Configurations:
+  #           - Classification: docker
+  #             ConfigurationProperties:
+  #               docker.privileged-containers.registries: !Sub local,centos,${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com
+  #               docker.trusted.registries: !Sub local,centos,${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com
+  #       - Classification: livy-conf
+  #         ConfigurationProperties:
+  #           livy.spark.master: yarn
+  #           livy.spark.deploy-mode: cluster
+  #           livy.server.session.timeout: 16h
+  #       - Classification: hive-site
+  #         ConfigurationProperties:
+  #           hive.execution.mode: container
+  #       - Classification: spark-defaults
+  #         ConfigurationProperties:
+  #           spark.executorEnv.YARN_CONTAINER_RUNTIME_TYPE: docker
+  #           spark.yarn.am.waitTime: 300s
+  #           spark.yarn.appMasterEnv.YARN_CONTAINER_RUNTIME_TYPE: docker
+  #           spark.executorEnv.YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG: hdfs:///user/hadoop/config.json
+  #           spark.executorEnv.YARN_CONTAINER_RUNTIME_DOCKER_IMAGE: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrImage}:${EcrImageTag}
+  #           spark.executor.instances: 2
+  #           spark.yarn.appMasterEnv.YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG: hdfs:///user/hadoop/config.json
+  #           spark.yarn.appMasterEnv.YARN_CONTAINER_RUNTIME_DOCKER_IMAGE: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrImage}:${EcrImageTag}
+  #     Instances:
+  #       Ec2KeyName: !Ref EC2KeyPair
+  #       EmrManagedMasterSecurityGroup: !Ref EMRMasterSecurityGroup
+  #       EmrManagedSlaveSecurityGroup: !Ref EMRCoreTaskSecurityGroup
+  #       KeepJobFlowAliveWhenNoSteps: true
+  #       # https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-sg-specify.html
+  #       # ServiceAccessSecurityGroup: !Ref EMRServiceAccessSecurityGroup
+  #       TerminationProtected: false
+  #       ##################################################
+  #       # the instance fleet configuration
+  #       ##################################################
+  #       # CoreInstanceFleet:
+  #       #   InstanceTypeConfigs:
+  #       #     - BidPrice: String
+  #       #       BidPriceAsPercentageOfOnDemandPrice: Double
+  #       #       # Configurations:
+  #       #       #   - Configuration
+  #       #       # CustomAmiId: String
+  #       #       # EbsConfiguration:
+  #       #       #   EbsBlockDeviceConfigs:
+  #       #       #     - VolumeSpecification:
+  #       #       #         Iops: Integer
+  #       #       #         SizeInGB: Integer
+  #       #       #         VolumeType: String
+  #       #       #       VolumesPerInstance: Integer
+  #       #       #   EbsOptimized: Boolean
+  #       #       InstanceType: String
+  #       #       WeightedCapacity: Integer
+  #       #   LaunchSpecifications:
+  #       #     OnDemandSpecification:
+  #       #       AllocationStrategy: String
+  #       #     SpotSpecification:
+  #       #       AllocationStrategy: String
+  #       #       BlockDurationMinutes: Integer
+  #       #       TimeoutAction: String
+  #       #       TimeoutDurationMinutes: Integer
+  #       #   Name: String
+  #       #   TargetOnDemandCapacity: Integer
+  #       #   TargetSpotCapacity: Integer
+  #       # MasterInstanceFleet:
+  #       #   InstanceTypeConfigs:
+  #       #     - # The core instance fleet uses a maximum Spot price (BidPrice) as a percentage of On-Demand,
+  #       #       # while the task and master instance fleets use a maximum Spot price (BidPriceAsPercentageofOnDemandPrice) as a string in USD.
+  #       #       BidPrice: String
+  #       #       BidPriceAsPercentageOfOnDemandPrice: Double
+  #       #       # Configurations:
+  #       #       #   - Configuration
+  #       #       # CustomAmiId: String
+  #       #       # EbsConfiguration:
+  #       #       #   EbsBlockDeviceConfigs:
+  #       #       #     - VolumeSpecification:
+  #       #       #         Iops: Integer
+  #       #       #         SizeInGB: Integer
+  #       #       #         VolumeType: String
+  #       #       #       VolumesPerInstance: Integer
+  #       #       #   EbsOptimized: Boolean
+  #       #       InstanceType: m1.small
+  #       #       WeightedCapacity: 1
+  #       #   LaunchSpecifications:
+  #       #       OnDemandSpecification:
+  #       #         AllocationStrategy: String
+  #       #       SpotSpecification:
+  #       #         AllocationStrategy: String
+  #       #         BlockDurationMinutes: Integer
+  #       #         TimeoutAction: String
+  #       #         TimeoutDurationMinutes: Integer
+  #       #   Name: Masterfleet
+  #       #   TargetOnDemandCapacity: Integer
+  #       #   TargetSpotCapacity: Integer
+  #       # Ec2SubnetIds:
+  #       #   - !Ref PublicSubnetA
+  #       #   - !Ref PublicSubnetC
+  #       ##################################################
+  #       # the uniform instance group configuration
+  #       ##################################################
+  #       CoreInstanceGroup:
+  #         # AutoScalingPolicy: AutoScalingPolicy
+  #         # Configurations:
+  #         #   - Configuration
+  #         InstanceCount: 1
+  #         InstanceType: m1.small
+  #         Market: ON_DEMAND
+  #       Ec2SubnetId: !Ref PublicSubnetA
+  #       MasterInstanceGroup:
+  #         # AutoScalingPolicy: AutoScalingPolicy
+  #         # Configurations:
+  #         #   - Configuration
+  #         InstanceCount: 1
+  #         # https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-supported-instance-types.html
+  #         InstanceType: m1.small
+  #         Market: ON_DEMAND
+  #     JobFlowRole: !Ref EMRInstanceProfile
+  #     LogUri: !Ref EmrLogUri
+  #     Name: EMR 6.6.0 with Docker
+  #     ReleaseLabel: emr-6.6.0
+  #     #
+  #     # Scale-down behavior options are no longer supported since Amazon EMR release version 5.10.0.
+  #     # Because of the introduction of per-second billing in Amazon EC2,
+  #     # the default scale-down behavior for Amazon EMR clusters is now terminate at task completion.
+  #     #
+  #     # ScaleDownBehavior: TERMINATE_AT_INSTANCE_HOUR
+  #     ServiceRole: !Ref EMRDefaultRole
+  #     VisibleToAllUsers: true
+
+  # ------------------------------------------------------------#
+  # VPC
+  # ------------------------------------------------------------#
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}vpc
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}igw
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  # ------------------------------------------------------------#
+  #  Subnet
+  # ------------------------------------------------------------#
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Sub ${AWS::Region}a
+      CidrBlock: !Ref PublicSubnetACidr
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}public-subnet-a
+  PublicSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Sub ${AWS::Region}c
+      CidrBlock: !Ref PublicSubnetCCidr
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}public-subnet-c
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Sub ${AWS::Region}a
+      CidrBlock: !Ref PrivateSubnetACidr
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}private-subnet-a
+  PrivateSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Sub ${AWS::Region}c
+      CidrBlock: !Ref PrivateSubnetCCidr
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}private-subnet-c
+
+  # ------------------------------------------------------------#
+  #  RouteTable
+  # ------------------------------------------------------------#
+  PublicRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}public-route-a
+  PublicRouteTableC:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}public-route-c
+  PrivateRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}private-route-a
+  PrivateRouteTableC:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}private-route-c
+
+  # ------------------------------------------------------------#
+  # Routing
+  # ------------------------------------------------------------#
+  PublicRouteA:
+    Type: AWS::EC2::Route
+    DependsOn:
+      - InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTableA
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicRouteC:
+    Type: AWS::EC2::Route
+    DependsOn:
+      - InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTableC
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  # ------------------------------------------------------------#
+  # RouteTable Associate
+  # ------------------------------------------------------------#
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTableA
+  PublicSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetC
+      RouteTableId: !Ref PublicRouteTableC
+  PrivateSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTableA
+  PrivateSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetC
+      RouteTableId: !Ref PrivateRouteTableC
+
+  # ------------------------------------------------------------#
+  # Security Group
+  # ------------------------------------------------------------#
+  # Master
+  EMRMasterSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectPrefix}EMRMasterSecurityGroup
+      GroupDescription: Security Group for EMR Master
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - FromPort: 22
+          IpProtocol: tcp
+          CidrIp: 0.0.0.0/0
+          ToPort: 22
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}EMRMasterSecurityGroup
+
+  # Core
+  EMRCoreTaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectPrefix}EMRCoreTaskSecurityGroup
+      GroupDescription: Security Group for Core
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - FromPort: 22
+          IpProtocol: tcp
+          CidrIp: 0.0.0.0/0
+          ToPort: 22
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}EMRCoreTaskSecurityGroup
+
+  # ServiceAccess
+  EMRServiceAccessSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectPrefix}EMRServiceAccessSecurityGroup
+      GroupDescription: Security Group for Core
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - FromPort: 9443
+          IpProtocol: tcp
+          SourceSecurityGroupId: !Ref EMRMasterSecurityGroup
+          ToPort: 9443
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}EMRServiceAccessSecurityGroup
+
+  # ------------------------------------------------------------#
+  # IAM
+  # ------------------------------------------------------------#
+  EMRDefaultRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EMR_DefaultRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: elasticmapreduce.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceRole
+
+  EmrEc2DefaultRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EMR_EC2_DefaultRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceforEC2Role
+
+  EmrAutoScalingDefaultRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EMR_AutoScaling_DefaultRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: elasticmapreduce.amazonaws.com
+            Action: sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              Service: application-autoscaling.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceforAutoScalingRole
+
+  EMRInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EmrEc2DefaultRole
+
+  StepFunctionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceRole
+      Path: /
+      RoleName: StepFunctionsRole
+
+  # ------------------------------------------------------------#
+  # StepFunctions
+  # ------------------------------------------------------------#
+  StepFunctions:
+    Type: AWS::StepFunctions::StateMachine
+    DependsOn:
+      - StepFunctionsRole
+    Properties:
+      StateMachineName: step-functions
+      DefinitionString: !Sub |-
+        {
+          "Comment": "Comprehend Tutorial state machine",
+          "StartAt": "Create_Cluster",
+          "TimeoutSeconds": 3600,
+          "States": {
+            "Create_Cluster": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::elasticmapreduce:createCluster.sync",
+              "Parameters": {
+                "Applications": [
+                  {
+                    "Name": "Livy"
+                  },
+                  {
+                    "Name": "Spark"
+                  }
+                ],
+                "AutoScalingRole": "${EmrAutoScalingDefaultRole}",
+                "Configurations": [
+                  {
+                    "Classification": "container-executor",
+                    "ConfigurationProperties": {
+                    },
+                    "Configurations": [
+                      {
+                        "Classification": "docker",
+                        "ConfigurationProperties": {
+                          "docker.privileged-containers.registries": "local,centos,${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com",
+                          "docker.trusted.registries": "local,centos,${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "Classification": "livy-conf",
+                    "ConfigurationProperties": {
+                      "livy.spark.master": "yarn",
+                      "livy.spark.deploy-mode": "cluster",
+                      "livy.server.session.timeout": "16h"
+                    }
+                  },
+                  {
+                    "Classification": "hive-site",
+                    "ConfigurationProperties": {
+                      "hive.execution.mode": "container"
+                    }
+                  },
+                  {
+                    "Classification": "spark-defaults",
+                    "ConfigurationProperties": {
+                      "spark.executorEnv.YARN_CONTAINER_RUNTIME_TYPE": "docker",
+                      "spark.yarn.am.waitTime": "300s",
+                      "spark.yarn.appMasterEnv.YARN_CONTAINER_RUNTIME_TYPE": "docker",
+                      "spark.executorEnv.YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG": "hdfs:///user/hadoop/config.json",
+                      "spark.executorEnv.YARN_CONTAINER_RUNTIME_DOCKER_IMAGE": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrImage}:${EcrImageTag}",
+                      "spark.executor.instances": 2,
+                      "spark.yarn.appMasterEnv.YARN_CONTAINER_RUNTIME_DOCKER_CLIENT_CONFIG": "hdfs:///user/hadoop/config.json",
+                      "spark.yarn.appMasterEnv.YARN_CONTAINER_RUNTIME_DOCKER_IMAGE": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrImage}:${EcrImageTag}"
+                    }
+                  }
+                ],
+                "Instances": {
+                  "Ec2KeyName": "${EC2KeyPair}",
+                  "EmrManagedMasterSecurityGroup": "${EMRMasterSecurityGroup}",
+                  "EmrManagedSlaveSecurityGroup": "${EMRCoreTaskSecurityGroup}",
+                  "KeepJobFlowAliveWhenNoSteps": true,
+                  "TerminationProtected": false,
+                  "InstanceGroups": [
+                    {
+                      "Market": "ON_DEMAND",
+                      "InstanceRole": "MASTER",
+                      "InstanceType": "m1.small",
+                      "InstanceCount": 1
+                    },
+                    {
+                      "Market": "ON_DEMAND",
+                      "InstanceRole": "CORE",
+                      "InstanceType": "m1.small",
+                      "InstanceCount": 1
+                    }
+                  ],
+                  "Ec2SubnetId": "${PublicSubnetA}"
+                },
+                "JobFlowRole": "${EMRInstanceProfile}",
+                "LogUri": "${EmrLogUri}",
+                "Name": "EMR 6.6.0 with Docker",
+                "ReleaseLabel": "emr-6.6.0",
+                "ServiceRole": "${EMRDefaultRole}",
+                "VisibleToAllUsers": true
+              },
+              "End": true
+            }
+          }
+        }
+      RoleArn: !Sub ${StepFunctionsRole.Arn}

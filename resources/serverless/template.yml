@@ -1,0 +1,256 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: EMR
+# ------------------------------------------------------------#
+# Input Parameters
+# ------------------------------------------------------------#
+Parameters:
+  # Project Name Parameter
+  ProjectPrefix:
+    Type: String
+    Default: ""
+
+  EmrLogBucket:
+    Type: String
+
+  # NetWork Configuration Parameter
+  VPCCidr:
+    Type: String
+    Default: 192.168.0.0/16
+  PublicSubnetACidr:
+    Type: String
+    Default: 192.168.0.0/24
+  PublicSubnetCCidr:
+    Type: String
+    Default: 192.168.64.0/24
+  PrivateSubnetACidr:
+    Type: String
+    Default: 192.168.128.0/24
+  PrivateSubnetCCidr:
+    Type: String
+    Default: 192.168.192.0/24
+
+Resources:
+  # ------------------------------------------------------------#
+  # EMR
+  # ------------------------------------------------------------#
+  EMR:
+    Type: AWS::EMRServerless::Application
+    Properties:
+      AutoStartConfiguration:
+        Enabled: true
+      AutoStopConfiguration:
+        Enabled: true
+        IdleTimeoutMinutes: 15
+      InitialCapacity:
+        - Key: Driver
+          Value:
+            # https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/application-capacity.html
+            WorkerConfiguration:
+              Cpu: 1vCPU
+              Disk: 20GB
+              Memory: 2GB
+            WorkerCount: 1
+        - Key: Executor
+          Value:
+            WorkerConfiguration:
+              Cpu: 1vCPU
+              Disk: 20GB
+              Memory: 2GB
+            WorkerCount: 1
+      MaximumCapacity:
+        Cpu: 2vCPU
+        Disk: 40GB
+        Memory: 4GB
+      Name: EMRServerless
+      # NetworkConfiguration:
+      #   SecurityGroupIds:
+      #     - !Ref EMRSecurityGroup
+      #   SubnetIds:
+      #     - !Ref PrivateSubnetA
+      #     - !Ref PrivateSubnetC
+      ReleaseLabel: emr-6.6.0
+      # Tags:
+      #   - Tag
+      Type: Spark
+
+  # ------------------------------------------------------------#
+  # VPC
+  # ------------------------------------------------------------#
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}vpc
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}igw
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  # ------------------------------------------------------------#
+  #  Subnet
+  # ------------------------------------------------------------#
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Sub ${AWS::Region}a
+      CidrBlock: !Ref PublicSubnetACidr
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}public-subnet-a
+  PublicSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Sub ${AWS::Region}c
+      CidrBlock: !Ref PublicSubnetCCidr
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}public-subnet-c
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Sub ${AWS::Region}a
+      CidrBlock: !Ref PrivateSubnetACidr
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}private-subnet-a
+  PrivateSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Sub ${AWS::Region}c
+      CidrBlock: !Ref PrivateSubnetCCidr
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}private-subnet-c
+
+  # ------------------------------------------------------------#
+  #  RouteTable
+  # ------------------------------------------------------------#
+  PublicRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}public-route-a
+  PublicRouteTableC:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}public-route-c
+  PrivateRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}private-route-a
+  PrivateRouteTableC:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}private-route-c
+
+  # ------------------------------------------------------------#
+  # Routing
+  # ------------------------------------------------------------#
+  PublicRouteA:
+    Type: AWS::EC2::Route
+    DependsOn:
+      - InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTableA
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicRouteC:
+    Type: AWS::EC2::Route
+    DependsOn:
+      - InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTableC
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  # ------------------------------------------------------------#
+  # RouteTable Associate
+  # ------------------------------------------------------------#
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTableA
+  PublicSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetC
+      RouteTableId: !Ref PublicRouteTableC
+  PrivateSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTableA
+  PrivateSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetC
+      RouteTableId: !Ref PrivateRouteTableC
+
+  # ------------------------------------------------------------#
+  # Security Group
+  # ------------------------------------------------------------#
+  # EMR
+  EMRSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectPrefix}EMRSecurityGroup
+      GroupDescription: Security Group for EMR Master
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - FromPort: 443
+          IpProtocol: tcp
+          CidrIp: 0.0.0.0/0
+          ToPort: 443
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectPrefix}EMRSecurityGroup
+
+  # ------------------------------------------------------------#
+  # IAM
+  # ------------------------------------------------------------#
+  EMRJobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EMRJobRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: emr-serverless.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
